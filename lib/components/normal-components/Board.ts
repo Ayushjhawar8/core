@@ -1,6 +1,7 @@
 import { boardProps } from "@tscircuit/props"
 import { type Matrix, identity } from "transformation-matrix"
 import { Group } from "../primitive-components/Group/Group"
+import { getBoundsOfPcbComponents } from "../../utils/get-bounds-of-pcb-components"
 
 export class Board extends Group<typeof boardProps> {
   pcb_board_id: string | null = null
@@ -38,35 +39,21 @@ export class Board extends Group<typeof boardProps> {
     // Skip if width and height are explicitly provided
     if (props.width && props.height) return
 
-    let minX = Infinity
-    let minY = Infinity
-    let maxX = -Infinity
-    let maxY = -Infinity
+    // Use getBoundsOfPcbComponents to recursively get bounds of all components
+    const bounds = getBoundsOfPcbComponents(this.children)
 
-    // Look through all PCB components in the database that belong to children
-    for (const child of this.children) {
-      if (!child.pcb_component_id) continue
-      const pcb_component = db.pcb_component.get(child.pcb_component_id)
-      if (!pcb_component) continue
-
-      const { width, height, center } = pcb_component
-      if (width === 0 || height === 0) continue
-
-      minX = Math.min(minX, center.x - width / 2)
-      minY = Math.min(minY, center.y - height / 2)
-      maxX = Math.max(maxX, center.x + width / 2)
-      maxY = Math.max(maxY, center.y + height / 2)
-    }
+    // If no components found, use default minimal size
+    if (bounds.width === 0 || bounds.height === 0) return
 
     // Add padding around components (e.g. 2mm on each side)
     const padding = 2
-    const computedWidth = maxX - minX + padding * 2
-    const computedHeight = maxY - minY + padding * 2
+    const computedWidth = bounds.width + padding * 2
+    const computedHeight = bounds.height + padding * 2
 
     // Center the board around the components
     const center = {
-      x: (minX + maxX) / 2 + (props.outlineOffsetX ?? 0),
-      y: (minY + maxY) / 2 + (props.outlineOffsetY ?? 0),
+      x: (bounds.minX + bounds.maxX) / 2 + (props.outlineOffsetX ?? 0),
+      y: (bounds.minY + bounds.maxY) / 2 + (props.outlineOffsetY ?? 0),
     }
 
     // Update the board dimensions
